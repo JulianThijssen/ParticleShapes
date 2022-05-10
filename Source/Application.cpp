@@ -316,8 +316,6 @@ public:
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glDrawArrays(GL_POINTS, 0, NUM_PARTICLES * 2);
 
-
-
             // Perform horizontal blurring
             _blurShader.bind();
             _blurShader.uniform1i("tex", 0);
@@ -384,8 +382,14 @@ public:
 
     void onMouseMove(float x, float y) override
     {
-        //camRotation.x += y * 0.01f;
-        camRotation.y += x * 0.001f;
+        std::cout << "Mouse X:" << x << std::endl;
+        float dx = x - mouseX;
+        float dy = y - mouseY;
+
+        mouseX = x;
+        mouseY = y;
+        camRotation.x += dy * 0.05f;
+        camRotation.y += dx * 0.05f;
     }
 
     void onKeyPressed(int key, int mods) override
@@ -429,6 +433,8 @@ private:
     bool forward = false;
     bool backward = false;
     Vector3f camRotation;
+
+    float mouseX = 0, mouseY = 0;
 
     GLuint _vao;
     GLuint _vbo;
