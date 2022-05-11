@@ -111,7 +111,7 @@ unsigned int CustomAudioSourceInstance::getAudio(float* aBuffer, unsigned int aS
         //aBuffer[i] = cosineWave(200, fracInSecond);
         aBuffer[i] = testInput[(int) (testInput.size() * fracInSecond)];
     }
-    std::cout << aSamplesToRead << " " << aBufferSize << std::endl;
+    //std::cout << aSamplesToRead << " " << aBufferSize << std::endl;
     mSamplesRead += aSamplesToRead;
     return aSamplesToRead;
 }
