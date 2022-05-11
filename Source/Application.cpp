@@ -5,6 +5,7 @@
 #include "GDT/Maths.h"
 #include "GDT/OpenGL.h"
 
+#include "Camera.h"
 #include "Sound.h"
 #include "AudioFile.h"
 #include "CustomAudioSource.h"
@@ -19,6 +20,7 @@
 #include <fstream>
 
 #define NUM_PARTICLES 100000
+#define TWO_PI 6.28318530718
 
 std::default_random_engine generator = std::default_random_engine();
 std::uniform_real_distribution<float> distribution = std::uniform_real_distribution<float>(0, 1);
@@ -103,27 +105,11 @@ public:
 
     void init()
     {
-        //audioFile.load("after_youve_gone.wav");
-        //sampleRate = 44100;
-        //sampleRate = audioFile.getSampleRate();
-        //int bitDepth = audioFile.getBitDepth();
-        numSamples = 1000000;
-        //numSamples = audioFile.getNumSamplesPerChannel();
-        //double lengthInSeconds = audioFile.getLengthInSeconds();
-
-        //int numChannels = audioFile.getNumChannels();
-        //bool isMono = audioFile.isMono();
-        //bool isStereo = audioFile.isStereo();
-
-        // or, just use this quick shortcut to print a summary to the console
-        //audioFile.printSummary();
-
         gSoloud.init();
-        //gWave.load("after_youve_gone.wav");
         
         soundHandle = gSoloud.play(audioSource);
 
-        _window.create("Particle Shapes", 1024, 1024);
+        _window.create("Particle Shapes", winWidth, winHeight);
         _window.lockCursor(true);
 
         _window.addMouseMoveListener(this);
@@ -206,9 +192,9 @@ public:
 
         glClearColor(0, 0, 0, 1);
 
-        camPosition.set(0, 0, -5);
+        _camera.pos.set(0, 0, -5);
     }
-#define TWO_PI 6.28318530718
+
     void update()
     {
         while (!_window.shouldClose())
@@ -221,97 +207,35 @@ public:
             int channel = 0;
 
             size_t N = 1000;
-            //int sampleTime = max(0, streamTime * sampleRate - (N / 2));
-            //std::vector<double> samples(N);
-            //for (int i = sampleTime; i < sampleTime + N; i++)
-            //{
-            //    double currentSample = audioSource.mSamples[i];
-            //    samples[i - sampleTime] = currentSample;
-            //}
-
-            //fftw_complex* in, * out;
-            //fftw_plan p;
-
-            //in = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * N);
-            //float meanAmp = 0;
-            //for (int i = 0; i < N; i++)
-            //{
-            //    in[i][0] = samples[i];
-            //    meanAmp += abs(samples[i]);
-            //}
-            ////meanAmp /= N;
-            //out = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * N);
-            //p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
-
-            //fftw_execute(p); /* repeat as needed */
-
-            //std::ofstream myfile;
-            //myfile.open("outsamples.csv");
-            //for (int i = 0; i < N; i++)
-            //{
-            //    //std::cout << out[i][0] << std::endl;
-            //    myfile << out[i][0] << std::endl;
-            //}
-
-            //myfile.close();
-
-            //std::cout << "t: " << sampleTime << " amp: " << out[2000][0] << std::endl;
 
             if (forward)
-                camPosition += Vector3f(0, 0, 0.1f);
+                _camera.pos += Vector3f(0, 0, 0.1f);
             if (backward)
-                camPosition += Vector3f(0, 0, -0.1f);
+                _camera.pos += Vector3f(0, 0, -0.1f);
 
             for (int i = 0; i < NUM_PARTICLES; i++)
             {
                 points[i] = lerp(pointsA[i], pointsB[i], cosineWave(2.1f, time) * 0.5 + 0.5); //  * out[2000][0] // sin(time) * 0.5 + 0.5
             }
-            //std::cout << "Mean amp: " << meanAmp << std::endl;
-            //for (int i = NUM_PARTICLES; i < NUM_PARTICLES * 2; i++)
-            //{
-            //    const Vector3f& p = points[i - NUM_PARTICLES];
-
-            //    Vector3f q(p.x, -1.2 + meanAmp*0.01f, p.z);
-
-            //    points[i] = q;
-            //}
-            //
-            //fftw_destroy_plan(p);
-            //fftw_free(in); fftw_free(out);
-
 
             glBindBuffer(GL_ARRAY_BUFFER, _vbo);
             glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(Vector3f), points.data(), GL_STATIC_DRAW);
 
-            float _fieldOfView = 60;
-            float _aspectRatio = 1;
-            float _zNear = 0.1f;
-            float _zFar = 100.0f;
-
-            Matrix4f projMatrix;
-            float fieldOfViewRadians = _fieldOfView * (Math::PI / 180);
-            projMatrix[0] = (1.0f / tan(fieldOfViewRadians / 2)) / _aspectRatio;
-            projMatrix[5] = (1.0f / tan(fieldOfViewRadians / 2));
-            projMatrix[10] = (_zNear + _zFar) / (_zNear - _zFar);
-            projMatrix[11] = -1;
-            projMatrix[14] = (2 * _zNear * _zFar) / (_zNear - _zFar);
-            projMatrix[15] = 0;
-
-            Matrix4f viewMatrix;
-            viewMatrix.rotate(camRotation);
-            viewMatrix.translate(camPosition);
+            _camera.loadProjectionMatrix(_projMatrix);
+            _camera.loadViewMatrix(_viewMatrix);
 
             Matrix4f modelMatrix;
             modelMatrix.rotate(time, 0, 1, 0);
 
             _shader.bind();
-            _shader.uniformMatrix4f("projMatrix", projMatrix);
-            _shader.uniformMatrix4f("viewMatrix", viewMatrix);
+            _shader.uniformMatrix4f("projMatrix", _projMatrix);
+            _shader.uniformMatrix4f("viewMatrix", _viewMatrix);
             _shader.uniformMatrix4f("modelMatrix", modelMatrix);
 
             glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
-            glViewport(0, 0, 1024, 1024);
+            glViewport(0, 0, _window.getWidth(), _window.getHeight());
 
+            // Draw particles
             glDrawBuffer(GL_COLOR_ATTACHMENT0);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glDrawArrays(GL_POINTS, 0, NUM_PARTICLES * 2);
@@ -388,8 +312,8 @@ public:
 
         mouseX = x;
         mouseY = y;
-        camRotation.x += dy * 0.05f;
-        camRotation.y += dx * 0.05f;
+        _camera.rot.x += dy * 0.05f;
+        _camera.rot.y += dx * 0.05f;
     }
 
     void onKeyPressed(int key, int mods) override
@@ -420,6 +344,9 @@ public:
 private:
     Window _window;
 
+    int winWidth = 1024;
+    int winHeight = 1024;
+
     ShaderProgram _shader;
     ShaderProgram _quadShader;
     ShaderProgram _blurShader;
@@ -429,10 +356,12 @@ private:
     std::vector<Vector3f> pointsA;
     std::vector<Vector3f> pointsB;
 
-    Vector3f camPosition;
+    Camera _camera;
+    Matrix4f _projMatrix;
+    Matrix4f _viewMatrix;
+
     bool forward = false;
     bool backward = false;
-    Vector3f camRotation;
 
     float mouseX = 0, mouseY = 0;
 

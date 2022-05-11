@@ -4,6 +4,8 @@ set(BASE_SOURCES
     ${DIR}/Application.cpp
     ${DIR}/CustomAudioSource.h
     ${DIR}/CustomAudioSource.cpp
+    ${DIR}/Camera.h
+    ${DIR}/Camera.cpp
     ${DIR}/Sound.h
     ${DIR}/Sound.cpp
     PARENT_SCOPE
