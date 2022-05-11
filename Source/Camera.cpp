@@ -28,6 +28,6 @@ void Camera::loadProjectionMatrix(Matrix4f& projMatrix)
 void Camera::loadViewMatrix(Matrix4f& viewMatrix)
 {
     viewMatrix.setIdentity();
-    viewMatrix.rotate(rot);
-    viewMatrix.translate(pos);
+    viewMatrix.rotate(-rot);
+    viewMatrix.translate(-pos);
 }

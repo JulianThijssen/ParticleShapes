@@ -195,7 +195,25 @@ public:
 
         glClearColor(0, 0, 0, 1);
 
-        _camera.pos.set(0, 0, -5);
+        _camera.pos.set(0, 0, 5);
+    }
+
+    Vector3f directionFromRotation(Vector3f rotation, Vector3f initialDirection, bool normalized)
+    {
+        Matrix4f yawMatrix;
+        yawMatrix.rotate(rotation.y, 0, 1, 0);
+
+        Matrix4f pitchMatrix;
+        pitchMatrix.rotate(rotation.x, 1, 0, 0);
+
+        Vector3f direction;
+        direction = pitchMatrix.transform(initialDirection, 0);
+        direction = yawMatrix.transform(direction, 0);
+
+        if (normalized) {
+            return direction.normalize();
+        }
+        return direction;
     }
 
     void update()
@@ -206,15 +224,23 @@ public:
             //std::cout << "Stream time: " << streamTime << std::endl;
             time += 0.016f;
 
+            Vector3f direction;
             if (forward)
-                _camera.pos += Vector3f(0, 0, 0.1f);
+                direction.z = -1;
             if (backward)
-                _camera.pos += Vector3f(0, 0, -0.1f);
+                direction.z = 1;
+            if (left)
+                direction.x = -1;
+            if (right)
+                direction.x = 1;
 
-            for (int i = 0; i < NUM_PARTICLES; i++)
-            {
-                points[i] = lerp(pointsA[i], pointsB[i], cosineWave(0.21f, time) * 0.5 + 0.5); //  * out[2000][0] // sin(time) * 0.5 + 0.5
-            }
+            direction = directionFromRotation(_camera.rot, direction, false);
+            _camera.pos += direction * 0.2f;
+
+            //for (int i = 0; i < NUM_PARTICLES; i++)
+            //{
+            //    points[i] = lerp(pointsA[i], pointsB[i], cosineWave(0.21f, time) * 0.5 + 0.5); //  * out[2000][0] // sin(time) * 0.5 + 0.5
+            //}
 
             glBindBuffer(GL_ARRAY_BUFFER, _vbo);
             glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(Vector3f), points.data(), GL_STATIC_DRAW);
@@ -296,32 +322,30 @@ public:
 
         mouseX = x;
         mouseY = y;
-        _camera.rot.x += dy * 0.05f;
-        _camera.rot.y += dx * 0.05f;
+        _camera.rot.x -= dy * 0.05f;
+        _camera.rot.y -= dx * 0.05f;
     }
 
     void onKeyPressed(int key, int mods) override
     {
         std::cout << key << std::endl;
-        if (key == 87)
+        switch (key)
         {
-            forward = true;
-        }
-        if (key == 83)
-        {
-            backward = true;
+        case 87: forward = true; break;
+        case 83: backward = true; break;
+        case 65: left = true; break;
+        case 68: right = true; break;
         }
     }
 
     void onKeyReleased(int key, int mods) override
     {
-        if (key == 87)
+        switch (key)
         {
-            forward = false;
-        }
-        if (key == 83)
-        {
-            backward = false;
+        case 87: forward = false; break;
+        case 83: backward = false; break;
+        case 65: left = false; break;
+        case 68: right = false; break;
         }
     }
 
@@ -346,6 +370,8 @@ private:
 
     bool forward = false;
     bool backward = false;
+    bool left = false;
+    bool right = false;
 
     float mouseX = 0, mouseY = 0;
 
