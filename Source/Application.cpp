@@ -7,11 +7,10 @@
 
 #include "Camera.h"
 #include "Sound.h"
-#include "AudioFile.h"
-#include "CustomAudioSource.h"
-#include <fftw3.h>
-#include "soloud.h"
-#include "soloud_wav.h"
+
+#include "Reactive/AudioEngine.h"
+#include "Reactive/CustomAudioSource.h"
+#include "Reactive/FFT.h"
 
 #include <cmath>
 #include <vector>
@@ -19,46 +18,87 @@
 #include <iostream>
 #include <fstream>
 
-#define NUM_PARTICLES 100000
+#define NUM_PARTICLES 500000
 #define TWO_PI 6.28318530718
 
 std::default_random_engine generator = std::default_random_engine();
 std::uniform_real_distribution<float> distribution = std::uniform_real_distribution<float>(0, 1);
 std::normal_distribution<float> norm_dist = std::normal_distribution<float>();
 
-void generatePoints(Vector3f min, Vector3f max, std::vector<Vector3f>& points)
+//void generatePoints(Vector3f min, Vector3f max, std::vector<Vector3f>& points)
+//{
+//    Vector3f range = max - min;
+//
+//    points.resize(NUM_PARTICLES);
+//    for (int i = 0; i < NUM_PARTICLES; i++)
+//    {
+//        float x = distribution(generator) * range.x + min.x;
+//        float y = distribution(generator) * range.y + min.y;
+//        float z = distribution(generator) * range.z + min.z;
+//
+//        points[i].set(x, y, z);
+//    }
+//
+//    for (int i = 0; i < (int) (NUM_PARTICLES * 0.8f); i++)
+//    {
+//        const Vector3f& p = points[i];
+//
+//        int d = (int)(distribution(generator) * 3);
+//
+//        if (d == 0)
+//        {
+//            points[i].x = p.x < 0 ? min.x : max.x;
+//            //points[i].y = p.y < 0 ? min.y : max.y;
+//        }
+//        if (d == 1)
+//        {
+//            points[i].y = p.y < 0 ? min.y : max.y;
+//            //points[i].z = p.z < 0 ? min.z : max.z;
+//        }
+//        if (d == 2)
+//        {
+//            points[i].z = p.z < 0 ? min.z : max.z;
+//            //points[i].x = p.x < 0 ? min.x : max.x;
+//        }
+//    }
+//}
+
+void generatePoints(Vector3f min, Vector3f max, std::vector<Vector3f>& points, float t = 0)
 {
+    Vector3f range = max - min;
+
     points.resize(NUM_PARTICLES);
+
     for (int i = 0; i < NUM_PARTICLES; i++)
     {
-        float x = distribution(generator) * 2 - 1;
-        float y = distribution(generator) * 2 - 1;
-        float z = distribution(generator) * 2 - 1;
+        float ty = ((float)i / NUM_PARTICLES);
+
+        float x = distribution(generator) * 10 - 5;
+        float z = distribution(generator) * 10 - 5;
+        float y = sin(fabs(x*z) * TWO_PI - t) * cos(fabs(z) * TWO_PI - t) * 0.1f;// *sin((x * z) * TWO_PI) * 0.1f;
+        //z = sin(y);
+        //float y = sin(cos(x * TWO_PI + t) + t) * cos(z * TWO_PI) * 0.1f;
 
         points[i].set(x, y, z);
     }
+}
 
-    for (int i = 0; i < (int) (NUM_PARTICLES * 0.8f); i++)
+void generateCylinder(Vector3f min, Vector3f max, std::vector<Vector3f>& points)
+{
+    Vector3f range = max - min;
+
+    points.resize(NUM_PARTICLES);
+
+    for (int i = 0; i < NUM_PARTICLES; i++)
     {
-        const Vector3f& p = points[i];
+        float tx = distribution(generator) * TWO_PI;
+        float ty = distribution(generator) * TWO_PI;
 
-        int d = (int)(distribution(generator) * 3);
+        float x = sin(tx);
+        float y = sin(ty);
+        float z = cos(tx);
 
-        if (d == 0)
-        {
-            points[i].x = p.x < 0 ? min.x : max.x;
-            points[i].y = p.y < 0 ? min.y : max.y;
-        }
-        if (d == 1)
-        {
-            points[i].y = p.y < 0 ? min.y : max.y;
-            points[i].z = p.z < 0 ? min.z : max.z;
-        }
-        if (d == 2)
-        {
-            points[i].z = p.z < 0 ? min.z : max.z;
-            points[i].x = p.x < 0 ? min.x : max.x;
-        }
+        points[i].set(x, y, z);
     }
 }
 
@@ -95,19 +135,58 @@ Vector3f lerp(Vector3f a, Vector3f b, float t)
     return a * t + b * (1 - t);
 }
 
+void generateWhiteNoise(std::vector<float>& sample)
+{
+    int N = 44100;
+    std::vector<double> frequencies(N * 2);
+
+    // Set frequencies for white noise
+    for (int i = 0; i < N; i++)
+    {
+        frequencies[i*2+0] = 0;
+        frequencies[i*2+1] = 0;
+    }
+
+    int maxFreq = 600;
+    for (int i = 100; i < maxFreq; i++)
+    {
+        float phase = distribution(generator) * TWO_PI;
+        float dMag = 400.0f;
+        float magnitude = dMag - (dMag * i / maxFreq);
+        frequencies[i*2+0] = cos(phase) * magnitude;
+        frequencies[i*2+1] = sin(phase) * magnitude;
+
+        //freq[N - i][0] = -freq[i][0];
+        //freq[N - i][1] = -freq[i][1];
+    }
+
+    printf("\nInverse transform:\n");
+    inverseFFT(frequencies, sample);
+}
+
 class Application : public MouseMoveListener, KeyListener
 {
 public:
-    Application()
+    Application() :
+        audioSource(44100)
     {
 
     }
 
     void init()
     {
-        gSoloud.init();
-        
-        soundHandle = gSoloud.play(audioSource);
+        //gSoloud.init();
+        //
+        //soundHandle = gSoloud.play(audioSource);
+
+
+
+        audioEngine.Init();
+        audioEngine.SetAudioSource(&audioSource);
+        audioSource.samples.resize(44100);
+        generateWhiteNoise(audioSource.samples);
+        audioSource.setLooping(true);
+        audioEngine.Play();
 
         _window.create("Particle Shapes", winWidth, winHeight);
         _window.enableVSync(true);
@@ -220,7 +299,7 @@ public:
     {
         while (!_window.shouldClose())
         {
-            SoLoud::time streamTime = gSoloud.getStreamPosition(soundHandle);
+            //SoLoud::time streamTime = gSoloud.getStreamPosition(soundHandle);
             //std::cout << "Stream time: " << streamTime << std::endl;
             time += 0.016f;
 
@@ -279,6 +358,8 @@ public:
 
             glBindFramebuffer(GL_FRAMEBUFFER, _blurFbo);
             glViewport(0, 0, 512, 512);
+
+            generatePoints(Vector3f(-0.5f, -0.5f, -2), Vector3f(0.5f, 0.5f, 2), points, time * 10);
 
             glDrawBuffer(GL_COLOR_ATTACHMENT0);
             glClear(GL_COLOR_BUFFER_BIT);
@@ -390,9 +471,14 @@ private:
     int numSamples = 1;
     int sampleRate = 1;
 
-    SoLoud::Soloud gSoloud; // SoLoud engine
-    SoLoud::Wav gWave;      // One wave file
+    //SoLoud::Soloud gSoloud; // SoLoud engine
+    //SoLoud::Wav gWave;      // One wave file
+    //CustomAudioSource audioSource;
+
+    AudioEngine audioEngine;
     CustomAudioSource audioSource;
+
+
     int soundHandle;
 };
 

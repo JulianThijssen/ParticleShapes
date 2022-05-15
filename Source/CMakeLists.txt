@@ -2,8 +2,8 @@ set(DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(BASE_SOURCES
     ${DIR}/Application.cpp
-    ${DIR}/CustomAudioSource.h
-    ${DIR}/CustomAudioSource.cpp
+    # ${DIR}/CustomAudioSource.h
+    # ${DIR}/CustomAudioSource.cpp
     ${DIR}/Camera.h
     ${DIR}/Camera.cpp
     ${DIR}/Sound.h
